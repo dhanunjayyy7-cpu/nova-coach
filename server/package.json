@@ -1,0 +1,22 @@
+{
+  "name": "nova-coach-server",
+  "version": "1.0.0",
+  "description": "Nova Coach API — auth and Gemini-powered personal verdicts for NOVA",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "dev": "node --watch --env-file-if-exists=.env src/index.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^4.1.0"
+  }
+}

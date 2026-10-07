@@ -1,0 +1,6 @@
+/* Tailwind for Nova Coach screens only: no preflight (so existing styles are
+   untouched) and a `tw:` prefix so utilities can't collide with existing class
+   names. Utilities are imported unlayered on purpose — layered utilities would
+   lose to the app's unlayered element rules such as `button { font: inherit }`. */
+@import 'tailwindcss/theme.css' layer(theme) prefix(tw);
+@import 'tailwindcss/utilities.css' prefix(tw);

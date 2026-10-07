@@ -1,0 +1,2 @@
+# The Express API deploys separately (Render) and holds secrets in server/.env.
+server

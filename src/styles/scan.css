@@ -1,0 +1,305 @@
+/* ---------- Scan screen ---------- */
+.scan-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: calc(100dvh - var(--tab-bar-space));
+  padding: calc(20px + var(--safe-top)) 20px 16px;
+}
+
+.scan-header {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---------- Camera card ---------- */
+.camera-card {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 360px;
+  max-height: 560px;
+  border-radius: var(--radius-lg);
+  background: #0f1020;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.camera-video,
+.barcode-reader {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.camera-video {
+  object-fit: cover;
+}
+
+/* html5-qrcode injects its own video + shaded region; make them fill the card. */
+.barcode-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+.barcode-reader > div {
+  border-color: transparent !important;
+}
+
+.camera-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  margin: 0;
+  max-width: calc(100% - 32px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(15, 16, 32, 0.6);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.camera-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: rgba(15, 16, 32, 0.6);
+  color: #fff;
+  text-align: center;
+}
+
+.camera-overlay p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.camera-overlay-solid {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.overlay-title {
+  font-size: 1.25rem;
+  font-weight: 800 !important;
+}
+
+.overlay-text {
+  max-width: 260px;
+  color: var(--ink-2);
+  font-weight: 400 !important;
+}
+
+.overlay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 260px;
+  margin-top: 8px;
+}
+
+.overlay-primary,
+.overlay-secondary,
+.camera-retry {
+  min-height: 48px;
+  border: none;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.overlay-primary,
+.camera-retry {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow-accent);
+}
+
+.overlay-secondary {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Viewfinder corners */
+.viewfinder {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  width: 78%;
+  aspect-ratio: 4 / 3;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.viewfinder > span {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 4px solid var(--accent);
+}
+
+.viewfinder > span:nth-child(1) {
+  top: 0;
+  left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-top-left-radius: 18px;
+}
+
+.viewfinder > span:nth-child(2) {
+  top: 0;
+  right: 0;
+  border-left: 0;
+  border-bottom: 0;
+  border-top-right-radius: 18px;
+}
+
+.viewfinder > span:nth-child(3) {
+  bottom: 0;
+  left: 0;
+  border-right: 0;
+  border-top: 0;
+  border-bottom-left-radius: 18px;
+}
+
+.viewfinder > span:nth-child(4) {
+  bottom: 0;
+  right: 0;
+  border-left: 0;
+  border-top: 0;
+  border-bottom-right-radius: 18px;
+}
+
+.viewfinder-line {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(0, 200, 150, 0.9);
+  animation: sweep 2.4s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  0%,
+  100% {
+    top: 8%;
+  }
+  50% {
+    top: 90%;
+  }
+}
+
+/* Camera error */
+.camera-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.camera-error-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+  border-radius: 22px;
+  background: #ffeced;
+  color: #e5394b;
+}
+
+.camera-error-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.camera-error-text {
+  margin: 0;
+  max-width: 280px;
+  color: var(--ink-2);
+  font-size: 0.95rem;
+}
+
+.camera-retry {
+  min-width: 180px;
+  margin-top: 12px;
+  padding: 0 24px;
+}
+
+/* Shutter */
+.shutter-row {
+  display: flex;
+  justify-content: center;
+}
+
+.shutter {
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 4px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.12s ease, opacity 0.2s ease;
+}
+
+.shutter span {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.shutter:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+.shutter:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.scan-footnote {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  text-align: center;
+}
