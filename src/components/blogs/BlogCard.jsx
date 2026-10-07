@@ -1,3 +1,5 @@
+import { sectionFor } from '../../data/blogs'
+
 function BlogCard({ article, onOpen, compact = false }) {
   return (
     <button
@@ -6,7 +8,7 @@ function BlogCard({ article, onOpen, compact = false }) {
       onClick={() => onOpen(article.id)}
     >
       <span className="blog-card-top">
-        <span className="blog-tag">{article.category}</span>
+        <span className="blog-tag">{sectionFor(article).label}</span>
         <span className="blog-read">{article.readTime}</span>
       </span>
       <span className="blog-card-title">{article.title}</span>

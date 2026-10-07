@@ -9,8 +9,11 @@ import {
   stopStream,
 } from '../../utils/camera'
 import CameraError from './CameraError'
+import GalleryButton from './GalleryButton'
 
 const READER_ID = 'nova-barcode-reader'
+// Gallery images are decoded on their own hidden instance so they never clash with a running camera scan.
+const FILE_READER_ID = 'nova-barcode-file-reader'
 
 const FORMATS = [
   Html5QrcodeSupportedFormats.EAN_13,
@@ -40,67 +43,81 @@ async function lookUpProduct(code) {
   return data.status === 1 ? data.product : null
 }
 
+const STOPPED_PHASES = ['not-found', 'no-ingredients', 'lookup-error', 'image-no-barcode']
+
 function BarcodeScanner({ onResult, onSwitchToLabel }) {
   const scannerRef = useRef(null)
-  const onResultRef = useRef(onResult)
-  useEffect(() => {
-    onResultRef.current = onResult
-  }, [onResult])
+  const handledRef = useRef(false)
+  const mountedRef = useRef(true)
+  const detectRef = useRef(null)
 
   const [unavailable] = useState(cameraUnavailableReason)
   const [cameraError, setCameraError] = useState(null)
-  // starting | scanning | looking-up | not-found | no-ingredients | lookup-error
+  // starting | scanning | reading-image | looking-up | not-found | no-ingredients | lookup-error | image-no-barcode
   const [phase, setPhase] = useState('starting')
   const [barcode, setBarcode] = useState('')
   const [productName, setProductName] = useState('')
   const [retryToken, setRetryToken] = useState(0)
 
   useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  // Shared by the live camera and gallery uploads.
+  async function handleCode(code) {
+    if (handledRef.current || !mountedRef.current) return
+    handledRef.current = true
+    setBarcode(code)
+    setPhase('looking-up')
+    await stopScanner(scannerRef.current, document.getElementById(READER_ID))
+
+    let product
+    try {
+      product = await lookUpProduct(code)
+    } catch (err) {
+      console.error('Open Food Facts lookup error:', err)
+      if (mountedRef.current) setPhase('lookup-error')
+      return
+    }
+    if (!mountedRef.current) return
+
+    if (!product) {
+      setPhase('not-found')
+      return
+    }
+
+    const ingredientsText = product.ingredients_text_en || product.ingredients_text
+    if (!ingredientsText) {
+      setProductName(product.product_name || 'This product')
+      setPhase('no-ingredients')
+      return
+    }
+
+    onResult({
+      type: 'barcode',
+      productName: product.product_name || 'Unnamed product',
+      brand: product.brands || '',
+      barcode: code,
+      category: (product.categories || '').split(',')[0]?.trim() || '',
+      imageUrl: product.image_front_url || product.image_url || product.image_front_small_url || '',
+      nutriments: product.nutriments || {},
+      analysis: analyzeIngredients(ingredientsText, getProfile()),
+      cleanedText: ingredientsText,
+    })
+  }
+
+  useEffect(() => {
+    detectRef.current = handleCode
+  })
+
+  useEffect(() => {
     if (unavailable) return
     let cancelled = false
-    let handled = false
+    handledRef.current = false
     const container = document.getElementById(READER_ID)
-
-    async function handleDetected(code) {
-      if (handled || cancelled) return
-      handled = true
-      setBarcode(code)
-      setPhase('looking-up')
-      await stopScanner(scannerRef.current, container)
-
-      let product
-      try {
-        product = await lookUpProduct(code)
-      } catch (err) {
-        console.error('Open Food Facts lookup error:', err)
-        if (!cancelled) setPhase('lookup-error')
-        return
-      }
-      if (cancelled) return
-
-      if (!product) {
-        setPhase('not-found')
-        return
-      }
-
-      const ingredientsText = product.ingredients_text_en || product.ingredients_text
-      if (!ingredientsText) {
-        setProductName(product.product_name || 'This product')
-        setPhase('no-ingredients')
-        return
-      }
-
-      onResultRef.current({
-        type: 'barcode',
-        productName: product.product_name || 'Unnamed product',
-        brand: product.brands || '',
-        barcode: code,
-        imageUrl: product.image_front_small_url || product.image_url || '',
-        nutriments: product.nutriments || {},
-        analysis: analyzeIngredients(ingredientsText, getProfile()),
-        cleanedText: ingredientsText,
-      })
-    }
 
     async function start() {
       const permission = await requestCameraPermission()
@@ -123,7 +140,9 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
               height: Math.round(Math.min(h * 0.4, 170)),
             }),
           },
-          handleDetected,
+          (code) => {
+            if (!cancelled) detectRef.current?.(code)
+          },
           () => {},
         )
         // Unmounted while the camera was still starting — release it now.
@@ -131,7 +150,7 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
           await stopScanner(scanner, container)
           return
         }
-        setPhase('scanning')
+        setPhase((p) => (p === 'starting' ? 'scanning' : p))
       } catch (err) {
         console.error('Barcode scanner start error:', err)
         if (!cancelled) setCameraError({ message: cameraErrorMessage(err), retryable: true })
@@ -147,6 +166,26 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
     }
   }, [retryToken, unavailable])
 
+  async function scanGalleryImage(file) {
+    setPhase('reading-image')
+    let code
+    const fileScanner = new Html5Qrcode(FILE_READER_ID, { formatsToSupport: FORMATS, verbose: false })
+    try {
+      code = await fileScanner.scanFile(file, false)
+    } catch {
+      if (mountedRef.current) setPhase('image-no-barcode')
+      return
+    } finally {
+      try {
+        fileScanner.clear()
+      } catch {
+        // nothing to clear
+      }
+    }
+    handledRef.current = false
+    handleCode(code)
+  }
+
   function restart() {
     setCameraError(null)
     setBarcode('')
@@ -156,7 +195,8 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
   }
 
   const error = unavailable ?? cameraError
-  const stopped = ['not-found', 'no-ingredients', 'lookup-error'].includes(phase)
+  const stopped = STOPPED_PHASES.includes(phase)
+  const busy = phase === 'looking-up' || phase === 'reading-image'
 
   return (
     <>
@@ -171,6 +211,7 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
         ) : (
           <div id={READER_ID} className="barcode-reader" />
         )}
+        <div id={FILE_READER_ID} hidden />
 
         {!error && phase === 'starting' && (
           <div className="camera-overlay">
@@ -183,10 +224,10 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
           <p className="camera-hint">Line up the barcode inside the box</p>
         )}
 
-        {phase === 'looking-up' && (
+        {busy && (
           <div className="camera-overlay">
             <div className="spinner" />
-            <p>Looking up {barcode}…</p>
+            <p>{phase === 'reading-image' ? 'Reading barcode from photo…' : `Looking up ${barcode}…`}</p>
           </div>
         )}
 
@@ -196,6 +237,7 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
               {phase === 'not-found' && 'Product not found'}
               {phase === 'no-ingredients' && 'No ingredient list'}
               {phase === 'lookup-error' && 'Couldn’t look it up'}
+              {phase === 'image-no-barcode' && 'No barcode found'}
             </p>
             <p className="overlay-text">
               {phase === 'not-found' &&
@@ -203,6 +245,8 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
               {phase === 'no-ingredients' &&
                 `${productName} has no ingredients on record. Scan the label instead.`}
               {phase === 'lookup-error' && 'Check your connection and try again.'}
+              {phase === 'image-no-barcode' &&
+                'We couldn’t spot a barcode in that photo. Try a closer, sharper picture.'}
             </p>
             <div className="overlay-actions">
               {phase !== 'lookup-error' && (
@@ -216,9 +260,15 @@ function BarcodeScanner({ onResult, onSwitchToLabel }) {
             </div>
           </div>
         )}
+
+        {!busy && !stopped && <GalleryButton onPick={scanGalleryImage} />}
       </div>
 
-      <p className="scan-footnote">Scanning starts automatically — no need to tap.</p>
+      <p className="scan-footnote">
+        {error
+          ? 'You can still upload a photo of the barcode from your gallery.'
+          : 'Scanning starts automatically — or upload a photo from your gallery.'}
+      </p>
     </>
   )
 }

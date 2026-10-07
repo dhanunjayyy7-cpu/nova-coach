@@ -1,35 +1,4 @@
-.filter-chips {
-  display: flex;
-  gap: 8px;
-  margin: -8px -20px 16px;
-  padding: 0 20px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.filter-chips::-webkit-scrollbar {
-  display: none;
-}
-
-.filter-chip {
-  flex: 0 0 auto;
-  min-height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--ink-2);
-  font-size: 0.9rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.filter-chip-active {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #fff;
-}
-
+/* ---------- Article cards (Home "Today's catch") ---------- */
 .blog-feed {
   display: flex;
   flex-direction: column;
@@ -97,37 +66,249 @@
   font-size: 1rem;
 }
 
-/* Article */
+/* ---------- Blogs tab ---------- */
+.blogs-topbar {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.blogs-search {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.blogs-search-toggle {
+  flex: 0 0 auto;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.blog-section {
+  margin-top: 20px;
+}
+
+.blog-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.blog-section-head .icon-button {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+}
+
+.blog-section-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.blog-section-subtitle {
+  margin: 2px 0 0;
+  color: var(--ink-2);
+  font-size: 0.92rem;
+}
+
+/* Horizontal scrolling row; bleeds to the screen edge */
+.blog-row {
+  display: flex;
+  gap: 14px;
+  margin: 0 -20px;
+  padding: 2px 20px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.blog-row::-webkit-scrollbar {
+  display: none;
+}
+
+.blog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 12px;
+}
+
+.blog-tile {
+  position: relative;
+  flex: 0 0 160px;
+  scroll-snap-align: start;
+}
+
+.blog-tile-wide {
+  flex-basis: auto;
+}
+
+.blog-tile-open {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.blog-tile-open:active .blog-cover {
+  transform: scale(0.97);
+}
+
+.blog-cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 20px;
+  transition: transform 0.12s ease;
+}
+
+.blog-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blog-cover-emoji {
+  font-size: 3rem;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18));
+}
+
+.blog-tile-cover {
+  width: 100%;
+  height: 120px;
+}
+
+.blog-views {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(15, 16, 32, 0.55);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.blog-tile-bookmark {
+  position: absolute;
+  top: 80px;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+}
+
+.blog-tile-bookmark.is-on {
+  color: var(--accent);
+}
+
+.blog-tile-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* ---------- Article ---------- */
 .article-screen {
-  padding: calc(12px + var(--safe-top)) 20px 32px;
+  padding: calc(8px + var(--safe-top)) 20px 32px;
 }
 
 .article-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin: 0 -4px 12px;
 }
 
-.article-topbar .detail-back {
-  margin: 0 0 0 -8px;
-}
-
-.share-button {
-  min-height: 44px;
-  display: inline-flex;
+.article-actions {
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 16px;
-  border: none;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: #00875f;
+}
+
+.article-actions .icon-button,
+.article-topbar > .icon-button {
+  width: 42px;
+  height: 42px;
+}
+
+.article-views {
+  padding: 0 6px;
+  color: var(--ink-2);
+  font-size: 0.85rem;
   font-weight: 700;
 }
 
+.article-liked {
+  color: #ff4757;
+}
+
+.article-bookmarked {
+  color: var(--accent);
+}
+
+.article-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.article-brand-logo {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+}
+
+.article-category {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .article-title {
-  margin: 12px 0 4px;
+  margin: 6px 0 4px;
   font-size: 1.9rem;
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -135,24 +316,60 @@
 }
 
 .article-meta {
-  margin: 0 0 20px;
+  margin: 0 0 16px;
   color: var(--ink-3);
   font-size: 0.9rem;
 }
 
-.article-body p {
-  margin: 0 0 16px;
-  font-size: 1.05rem;
+.article-cover {
+  width: 100%;
+  height: 200px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-lg);
+}
+
+.article-cover .blog-cover-emoji {
+  font-size: 4.5rem;
+}
+
+.article-section h2 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.article-section p {
+  margin: 0 0 14px;
+  font-size: 1.02rem;
   line-height: 1.65;
+}
+
+.article-section + .article-section {
+  margin-top: 8px;
+}
+
+.article-disclaimer {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: #eef0f4;
+  color: var(--ink-2);
+}
+
+.article-disclaimer p {
+  margin: 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  line-height: 1.5;
 }
 
 .article-footer {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 28px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
+  margin-top: 20px;
   color: var(--ink-3);
   font-size: 0.85rem;
   font-weight: 600;

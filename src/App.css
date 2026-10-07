@@ -737,6 +737,23 @@ input:focus-visible {
   background: var(--accent-soft);
 }
 
+.bubble-error {
+  background: #fff4e2;
+  color: #b06400;
+}
+
+.bubble-thinking {
+  color: var(--ink-2);
+  font-style: italic;
+  animation: thinking-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes thinking-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
 .chat-suggestions {
   display: flex;
   gap: 8px;
@@ -1009,6 +1026,38 @@ input:focus-visible {
 
 .sheet-footer {
   padding-top: 16px;
+}
+
+/* Search bar (Shelf, Blogs) */
+.search-bar {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink-3);
+}
+
+.search-bar input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.search-bar input:focus {
+  outline: none;
+}
+
+.search-bar:focus-within {
+  box-shadow: 0 0 0 3px rgba(0, 200, 150, 0.35);
 }
 
 /* Toast */

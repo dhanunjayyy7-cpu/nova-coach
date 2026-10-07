@@ -43,6 +43,49 @@ export const cleanSchema = z.object({
   rawText: z.string().trim().min(1).max(8000),
 })
 
+const verdictEnum = z.enum(['safe', 'caution', 'avoid'])
+
+export const chatSchema = z.object({
+  message: z.string().trim().min(1).max(1000),
+  context: z
+    .object({
+      tab: z.string().trim().max(20).optional(),
+      product: z
+        .object({
+          name: z.string().trim().max(200),
+          brand: z.string().trim().max(200).optional(),
+          score: z.number().min(0).max(100),
+          verdict: verdictEnum,
+          ingredients: z.string().max(3000).optional(),
+          flaggedAdditives: z
+            .array(z.object({ name: z.string().max(120), risk: z.string().max(20) }))
+            .max(30)
+            .optional(),
+          nutriments: z.record(z.string().max(40), z.number()).optional(),
+        })
+        .optional(),
+      recentScans: z
+        .array(z.object({ name: z.string().max(200), score: z.number(), verdict: verdictEnum }))
+        .max(3)
+        .optional(),
+      blogTitle: z.string().max(200).optional(),
+    })
+    .optional()
+    .default({}),
+  history: z
+    .array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().max(1500) }))
+    .max(8)
+    .optional()
+    .default([]),
+})
+
+export const alternativesSchema = z.object({
+  productName: z.string().trim().min(1).max(200),
+  category: z.string().trim().max(120).optional().default(''),
+  flaggedAdditives: z.array(z.string().trim().max(120)).max(20).optional().default([]),
+  score: z.number().min(0).max(100),
+})
+
 export const homeMessageSchema = z.object({
   scanCount: z.coerce.number().int().min(0).max(100000),
   averageScore: z.coerce.number().min(0).max(100).transform(Math.round),

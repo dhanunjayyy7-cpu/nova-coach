@@ -100,6 +100,14 @@ export function HeartIcon({ filled, ...props }) {
   )
 }
 
+export function BookmarkIcon({ filled, ...props }) {
+  return (
+    <Svg {...props} fill={filled ? 'currentColor' : 'none'}>
+      <path d="M6.5 4h11a1 1 0 0 1 1 1v15l-6.5-4-6.5 4V5a1 1 0 0 1 1-1Z" />
+    </Svg>
+  )
+}
+
 export function ChevronRightIcon(props) {
   return (
     <Svg {...props}>

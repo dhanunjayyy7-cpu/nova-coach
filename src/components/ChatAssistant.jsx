@@ -1,20 +1,44 @@
 import { useEffect, useRef, useState } from 'react'
 import { CloseIcon, SendIcon, SparkleIcon } from './icons'
+import { postAi } from '../utils/aiRequest'
+import { getHistory } from '../utils/history'
+import { verdictForScore } from '../utils/scoreLabels'
 
 const SUGGESTIONS = [
-  'Is maltodextrin bad for me?',
-  'Sugar-free sweetener alternatives?',
-  'What does INS 621 mean?',
-  'Healthy snacks for diabetics?',
+  'Is this product safe for me?',
+  'What does this additive do?',
+  'Suggest a healthier alternative',
+  'Explain this ingredient',
 ]
 
-const PLACEHOLDER_REPLY =
-  "I'm still learning! AI answers are coming soon — for now, try scanning a product to see its score."
+// Covers the server's 8s Gemini attempt plus time for the Vercel Groq fallback.
+const CHAT_BUDGET_MS = 16000
+const FALLBACK_REPLY = 'Sorry — I can’t reach my AI brain right now. Please try again in a moment.'
 
-function ChatAssistant() {
+function buildContext(currentTab, currentProduct, blogTitle) {
+  const recentScans = getHistory()
+    .slice(0, 3)
+    .map((r) => ({ name: r.productName.slice(0, 200), score: r.score, verdict: verdictForScore(r.score) }))
+  return {
+    tab: currentTab,
+    ...(currentProduct && { product: currentProduct }),
+    ...(recentScans.length > 0 && { recentScans }),
+    ...(blogTitle && { blogTitle }),
+  }
+}
+
+function emptyStateText(currentTab, currentProduct, blogTitle) {
+  if (currentProduct) return `Ask about ${currentProduct.name}`
+  if (blogTitle) return `Ask about “${blogTitle}” or anything food-related`
+  if (currentTab === 'home') return 'Ask me anything about food or your scans'
+  return 'Ask me about ingredients, additives or what fits your diet'
+}
+
+function ChatAssistant({ currentTab, currentProduct = null, blogTitle = null }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
+  const [thinking, setThinking] = useState(false)
   const listRef = useRef(null)
 
   useEffect(() => {
@@ -28,27 +52,36 @@ function ChatAssistant() {
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages])
+  }, [messages, thinking])
 
-  function send(text) {
+  async function send(text) {
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed || thinking) return
+
+    const history = messages
+      .filter((m) => !m.error)
+      .slice(-8)
+      .map((m) => ({ role: m.role, text: m.text }))
+    setMessages((prev) => [...prev, { id: Date.now(), role: 'user', text: trimmed }])
+    setDraft('')
+    setThinking(true)
+
+    const data = await postAi(
+      'chat',
+      { message: trimmed, context: buildContext(currentTab, currentProduct, blogTitle), history },
+      CHAT_BUDGET_MS,
+    )
+    const reply = data?.reply?.trim()
     setMessages((prev) => [
       ...prev,
-      { id: Date.now(), role: 'user', text: trimmed },
-      { id: Date.now() + 1, role: 'assistant', text: PLACEHOLDER_REPLY },
+      { id: Date.now() + 1, role: 'assistant', text: reply || FALLBACK_REPLY, error: !reply },
     ])
-    setDraft('')
+    setThinking(false)
   }
 
   return (
     <>
-      <button
-        type="button"
-        className="chat-fab"
-        aria-label="Ask NOVA AI"
-        onClick={() => setOpen(true)}
-      >
+      <button type="button" className="chat-fab" aria-label="Ask NOVA AI" onClick={() => setOpen(true)}>
         <SparkleIcon size={26} />
       </button>
 
@@ -64,34 +97,28 @@ function ChatAssistant() {
             <div className="sheet-handle" />
             <div className="sheet-header">
               <h2 className="sheet-title">Ask AI</h2>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="Close"
-                onClick={() => setOpen(false)}
-              >
+              <button type="button" className="icon-button" aria-label="Close" onClick={() => setOpen(false)}>
                 <CloseIcon size={20} />
               </button>
             </div>
 
-            <div className="chat-body" ref={listRef}>
+            <div className="chat-body" ref={listRef} aria-live="polite">
               {messages.length === 0 ? (
                 <div className="chat-welcome">
                   <div className="chat-avatar">
                     <SparkleIcon size={34} />
                   </div>
-                  <h3 className="chat-hello">Hi there!</h3>
-                  <p className="chat-intro">
-                    I’m your NOVA assistant. Ask me about ingredients, additives or what fits your diet.
-                  </p>
+                  <h3 className="chat-hello">Hi, I’m Nova!</h3>
+                  <p className="chat-intro">{emptyStateText(currentTab, currentProduct, blogTitle)}</p>
                 </div>
               ) : (
                 <ul className="chat-messages">
                   {messages.map((m) => (
-                    <li key={m.id} className={`bubble bubble-${m.role}`}>
+                    <li key={m.id} className={`bubble bubble-${m.role} ${m.error ? 'bubble-error' : ''}`}>
                       {m.text}
                     </li>
                   ))}
+                  {thinking && <li className="bubble bubble-assistant bubble-thinking">Nova is thinking…</li>}
                 </ul>
               )}
             </div>
@@ -116,17 +143,13 @@ function ChatAssistant() {
               <input
                 className="chat-input"
                 type="text"
-                placeholder="Type here"
+                placeholder={thinking ? 'Nova is thinking…' : 'Type here'}
                 value={draft}
+                maxLength={1000}
                 onChange={(e) => setDraft(e.target.value)}
                 aria-label="Message"
               />
-              <button
-                type="submit"
-                className="chat-send"
-                aria-label="Send"
-                disabled={!draft.trim()}
-              >
+              <button type="submit" className="chat-send" aria-label="Send" disabled={!draft.trim() || thinking}>
                 <SendIcon size={20} />
               </button>
             </form>

@@ -3,19 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { emptyProfile, getProfile, updateProfile } from '../../utils/profile'
 import { clearHistory, getHistory, getScanCount } from '../../utils/history'
 import { isVoiceEnabled, setVoiceEnabled } from '../../utils/voice'
+import { getReviewCount } from '../../utils/reviews'
 import { clearSession, getSession } from '../../coach/session'
-import {
-  ALLERGEN_OPTIONS,
-  DIET_OPTIONS,
-  GOAL_OPTIONS,
-  labelsFor,
-} from '../../constants/profileOptions'
+import { ALLERGEN_OPTIONS, DIET_OPTIONS, GOAL_OPTIONS, labelsFor } from '../../constants/profileOptions'
 import ChipGrid from '../onboarding/ChipGrid'
 import BottomSheet from '../BottomSheet'
 import Toast from '../Toast'
 import AboutScreen from '../profile/AboutScreen'
-import { ChevronRightIcon, LockIcon } from '../icons'
+import { FAQS, PREMIUM_TERMS, PRIVACY_POLICY, TERMS_OF_USE } from '../profile/infoContent'
+import { ChevronRightIcon, ScanIcon } from '../icons'
 import '../../styles/profile.css'
+
+const NOTIFICATIONS_KEY = 'nova_notifications'
 
 const FIELDS = {
   diet: {
@@ -34,6 +33,28 @@ const FIELDS = {
     hint: 'What would you like to eat more or less of?',
     options: GOAL_OPTIONS,
   },
+}
+
+const TEXT_SHEETS = {
+  privacy: { title: 'Privacy Policy', paragraphs: PRIVACY_POLICY },
+  premium: { title: 'Premium Terms', paragraphs: PREMIUM_TERMS },
+  terms: { title: 'Terms of Use', paragraphs: TERMS_OF_USE },
+}
+
+function readFlag(key) {
+  try {
+    return localStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeFlag(key, on) {
+  try {
+    localStorage.setItem(key, on ? '1' : '0')
+  } catch {
+    // ignore
+  }
 }
 
 function EditSheet({ field, initial, onSave, onClose }) {
@@ -82,6 +103,32 @@ function ConfirmClear({ count, onConfirm, onClose }) {
   )
 }
 
+function FeedbackSheet({ onSubmit, onClose }) {
+  const [text, setText] = useState('')
+  return (
+    <BottomSheet
+      title="Feedback"
+      onClose={onClose}
+      footer={
+        <button type="button" className="primary-button" disabled={!text.trim()} onClick={() => onSubmit(text.trim())}>
+          Send feedback
+        </button>
+      }
+    >
+      <p className="sheet-hint">Tell us what you like, or what we could do better.</p>
+      <textarea
+        className="settings-textarea"
+        rows={5}
+        maxLength={500}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Your feedback"
+        aria-label="Your feedback"
+      />
+    </BottomSheet>
+  )
+}
+
 function NameField({ value, onSave }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -117,21 +164,18 @@ function NameField({ value, onSave }) {
   return (
     <button
       type="button"
-      className="name-button"
+      className="name-edit-link"
       onClick={() => {
         setDraft(value)
         setEditing(true)
       }}
     >
-      <span className={value ? 'profile-name' : 'profile-name profile-name-empty'}>
-        {value || 'Add your name'}
-      </span>
-      <span className="name-edit">Edit</span>
+      {value ? 'Edit name' : 'Add your name'}
     </button>
   )
 }
 
-function Row({ label, value, onClick, danger, disabled, trailing, checked }) {
+function SettingsRow({ icon, label, value, onClick, danger, disabled, trailing, checked }) {
   const isSwitch = checked !== undefined
   return (
     <button
@@ -142,33 +186,40 @@ function Row({ label, value, onClick, danger, disabled, trailing, checked }) {
       role={isSwitch ? 'switch' : undefined}
       aria-checked={isSwitch ? checked : undefined}
     >
-      <span className="settings-row-text">
-        <span className="settings-row-label">{label}</span>
-        {value && <span className="settings-row-value">{value}</span>}
+      <span className="settings-row-icon" aria-hidden="true">
+        {icon}
       </span>
+      <span className="settings-row-label">{label}</span>
+      {value && <span className="settings-row-value">{value}</span>}
       {trailing ?? <ChevronRightIcon size={20} />}
     </button>
   )
 }
 
+function Switch({ on }) {
+  return (
+    <span className={`switch ${on ? 'switch-on' : ''}`} aria-hidden="true">
+      <span />
+    </span>
+  )
+}
+
 function ProfileTab() {
+  const navigate = useNavigate()
   const [profile, setProfile] = useState(() => getProfile() ?? emptyProfile())
   const [scanCount, setScanCount] = useState(getScanCount)
-  const [history, setHistory] = useState(getHistory)
+  const [historyCount, setHistoryCount] = useState(() => getHistory().length)
+  const [contributions] = useState(getReviewCount)
   const [voiceOn, setVoiceOn] = useState(isVoiceEnabled)
-  const navigate = useNavigate()
+  const [notificationsOn, setNotificationsOn] = useState(() => readFlag(NOTIFICATIONS_KEY))
   const [session, setSessionState] = useState(getSession)
-  const [editing, setEditing] = useState(null)
-  const [confirmClear, setConfirmClear] = useState(false)
+  const [sheet, setSheet] = useState(null) // preferences | diet | allergens | goals | faq | feedback | clear | privacy | premium | terms
   const [view, setView] = useState('main')
   const [toast, setToast] = useState('')
   const clearToast = useCallback(() => setToast(''), [])
-  const closeEdit = useCallback(() => setEditing(null), [])
-  const closeConfirm = useCallback(() => setConfirmClear(false), [])
+  const closeSheet = useCallback(() => setSheet(null), [])
 
   if (view === 'about') return <AboutScreen onBack={() => setView('main')} />
-
-  const savedCount = history.filter((r) => r.saved).length
 
   function save(patch) {
     setProfile(updateProfile(patch))
@@ -179,96 +230,221 @@ function ProfileTab() {
     return labels.length ? labels.join(', ') : 'Not set'
   }
 
-  function toggleVoice() {
-    setVoiceEnabled(!voiceOn)
-    setVoiceOn(!voiceOn)
+  async function shareApp() {
+    const url = window.location.origin
+    const text = 'NOVA scans food labels and gives every packet a clear health score.'
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'NOVA', text, url })
+        return
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setToast(`Link copied: ${url}`)
+    } catch {
+      setToast(`Share this link: ${url}`)
+    }
   }
 
-  function toggleAuth() {
-    if (!session) {
-      navigate('/login')
-      return
-    }
+  function logOut() {
     clearSession()
     setSessionState(null)
     setToast('Logged out — scans now use the general score only')
   }
 
+  const displayName = profile.name?.trim() || (session ? session.email.split('@')[0] : '')
+  const initial = displayName ? displayName.charAt(0).toUpperCase() : ''
+
   return (
     <div className="tab-screen profile-screen">
-      <section className="profile-head">
-        <div className="profile-avatar" aria-hidden="true">
-          {profile.name ? profile.name.trim().charAt(0).toUpperCase() : '🙂'}
+      {/* User card */}
+      <section className="user-card">
+        <div className={`profile-avatar ${initial ? '' : 'profile-avatar-guest'}`} aria-hidden="true">
+          {initial || (
+            <svg width="40" height="40" viewBox="0 0 40 40">
+              <path d="M20 4c9 0 15 6 15 15s-5 17-15 17S5 28 5 19 11 4 20 4Z" fill="#fff" opacity="0.95" />
+              <circle cx="15" cy="18" r="2.2" fill="#1A1A2E" />
+              <circle cx="25" cy="18" r="2.2" fill="#1A1A2E" />
+              <path d="M15 25c3 2.5 7 2.5 10 0" stroke="#1A1A2E" strokeWidth="2" fill="none" strokeLinecap="round" />
+            </svg>
+          )}
         </div>
-        <NameField value={profile.name} onSave={(name) => save({ name })} />
-        <p className="profile-privacy">
-          <LockIcon size={14} /> Your data stays on this phone.
-        </p>
-        <p className="profile-stats">
-          <strong>{scanCount}</strong> product{scanCount === 1 ? '' : 's'} scanned · <strong>{savedCount}</strong>{' '}
-          saved
-        </p>
+
+        {session ? (
+          <>
+            <h1 className="user-name">{displayName}</h1>
+            <p className="user-email">{session.email}</p>
+            <NameField value={profile.name} onSave={(name) => save({ name })} />
+            <button type="button" className="user-logout" onClick={logOut}>
+              Log out
+            </button>
+          </>
+        ) : (
+          <>
+            <h1 className="user-name">{profile.name?.trim() || 'Guest User'}</h1>
+            <p className="user-email">
+              You’re using NOVA as a guest. Log in to Nova Coach for a personal verdict on every scan.
+            </p>
+            <NameField value={profile.name} onSave={(name) => save({ name })} />
+            <button type="button" className="user-login" onClick={() => navigate('/login')}>
+              Log In
+            </button>
+          </>
+        )}
       </section>
 
-      <h2 className="section-title">Your food profile</h2>
-      <div className="settings-card">
-        <Row label="Diet" value={summary('diet')} onClick={() => setEditing('diet')} />
-        <Row label="Allergies" value={summary('allergens')} onClick={() => setEditing('allergens')} />
-        <Row label="Goals" value={summary('goals')} onClick={() => setEditing('goals')} />
+      {/* Stats */}
+      <div className="stats-row">
+        <div className="stat-card">
+          <span className="stat-icon" aria-hidden="true">
+            <ScanIcon size={24} />
+          </span>
+          <span className="stat-value">{scanCount}</span>
+          <span className="stat-label">Total Scan Count</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-icon" aria-hidden="true">
+            🏆
+          </span>
+          <span className="stat-value">{contributions}</span>
+          <span className="stat-label">Your Contribution</span>
+        </div>
       </div>
 
-      <h2 className="section-title">Settings</h2>
+      <h2 className="settings-section-label">General</h2>
       <div className="settings-card">
-        <Row
-          label="Voice readout"
-          value="Reads each score aloud after a scan"
-          onClick={toggleVoice}
-          checked={voiceOn}
-          trailing={
-            <span className={`switch ${voiceOn ? 'switch-on' : ''}`} aria-hidden="true">
-              <span />
-            </span>
-          }
+        <SettingsRow icon="ℹ️" label="About Us" onClick={() => setView('about')} />
+        <SettingsRow icon="⚙️" label="Preferences" onClick={() => setSheet('preferences')} />
+        <SettingsRow
+          icon="🔔"
+          label="Notifications"
+          checked={notificationsOn}
+          onClick={() => {
+            writeFlag(NOTIFICATIONS_KEY, !notificationsOn)
+            setNotificationsOn(!notificationsOn)
+          }}
+          trailing={<Switch on={notificationsOn} />}
         />
-        <Row
+        <SettingsRow
+          icon="🔊"
+          label="Voice readout"
+          checked={voiceOn}
+          onClick={() => {
+            setVoiceEnabled(!voiceOn)
+            setVoiceOn(!voiceOn)
+          }}
+          trailing={<Switch on={voiceOn} />}
+        />
+        <SettingsRow icon="🌐" label="Language" value="Eng (IN)" onClick={() => setToast('More languages coming soon')} />
+        <SettingsRow icon="❓" label="FAQs" onClick={() => setSheet('faq')} />
+        <SettingsRow
+          icon="🗑️"
           label="Clear scan history"
-          value={history.length ? `${history.length} on this phone` : 'Nothing to clear'}
-          onClick={() => setConfirmClear(true)}
-          disabled={history.length === 0}
+          value={historyCount ? String(historyCount) : ''}
+          onClick={() => setSheet('clear')}
+          disabled={historyCount === 0}
           danger
         />
-        <Row
-          label={session ? 'Log out of Nova Coach' : 'Log in to Nova Coach'}
-          value={session ? session.email : 'Get a personal verdict on every scan'}
-          onClick={toggleAuth}
-        />
-        <Row label="About NOVA & Privacy" onClick={() => setView('about')} />
       </div>
 
-      <p className="profile-version">NOVA · version 0.1</p>
+      <h2 className="settings-section-label">Reviews and Sharing</h2>
+      <div className="settings-card">
+        <SettingsRow icon="💡" label="Request a Feature" onClick={() => setToast('Coming soon')} />
+        <SettingsRow icon="💬" label="Feedback" onClick={() => setSheet('feedback')} />
+        <SettingsRow icon="⭐" label="Rate Us" onClick={() => setToast('Coming soon')} />
+        <SettingsRow icon="🔗" label="Share App" onClick={shareApp} />
+      </div>
 
-      {editing && (
+      <h2 className="settings-section-label">Legal</h2>
+      <div className="settings-card">
+        <SettingsRow icon="🔒" label="Privacy Policy" onClick={() => setSheet('privacy')} />
+        <SettingsRow icon="👑" label="Premium Terms" onClick={() => setSheet('premium')} />
+        <SettingsRow icon="📄" label="Terms of Use" onClick={() => setSheet('terms')} />
+      </div>
+
+      <footer className="profile-footer">
+        <span className="profile-footer-logo">N</span>
+        <p>Follow us on</p>
+        <p className="profile-footer-handle">@nova.official</p>
+        <p className="profile-footer-version">App version 1.0.0</p>
+      </footer>
+
+      {sheet === 'preferences' && (
+        <BottomSheet title="Preferences" onClose={closeSheet}>
+          <p className="sheet-hint">These personalise the flags on every scan.</p>
+          <div className="settings-card settings-card-flat">
+            {['diet', 'allergens', 'goals'].map((field) => (
+              <SettingsRow
+                key={field}
+                icon={field === 'diet' ? '🥦' : field === 'allergens' ? '🥜' : '🎯'}
+                label={FIELDS[field].title}
+                value={summary(field)}
+                onClick={() => setSheet(field)}
+              />
+            ))}
+          </div>
+        </BottomSheet>
+      )}
+
+      {FIELDS[sheet] && (
         <EditSheet
-          field={editing}
-          initial={profile[editing]}
-          onClose={closeEdit}
+          field={sheet}
+          initial={profile[sheet]}
+          onClose={() => setSheet('preferences')}
           onSave={(values) => {
-            save({ [editing]: values })
-            setEditing(null)
+            save({ [sheet]: values })
+            setSheet('preferences')
             setToast('Saved — new scans will use this')
           }}
         />
       )}
 
-      {confirmClear && (
+      {sheet === 'faq' && (
+        <BottomSheet title="FAQs" onClose={closeSheet}>
+          <dl className="faq-list">
+            {FAQS.map((item) => (
+              <div key={item.q} className="faq-item">
+                <dt>{item.q}</dt>
+                <dd>{item.a}</dd>
+              </div>
+            ))}
+          </dl>
+        </BottomSheet>
+      )}
+
+      {sheet === 'feedback' && (
+        <FeedbackSheet
+          onClose={closeSheet}
+          onSubmit={(text) => {
+            console.info('[feedback]', text)
+            setSheet(null)
+            setToast('Thank you for your feedback!')
+          }}
+        />
+      )}
+
+      {TEXT_SHEETS[sheet] && (
+        <BottomSheet title={TEXT_SHEETS[sheet].title} onClose={closeSheet}>
+          <div className="legal-text">
+            {TEXT_SHEETS[sheet].paragraphs.map((p) => (
+              <p key={p.slice(0, 32)}>{p}</p>
+            ))}
+          </div>
+        </BottomSheet>
+      )}
+
+      {sheet === 'clear' && (
         <ConfirmClear
-          count={history.length}
-          onClose={closeConfirm}
+          count={historyCount}
+          onClose={closeSheet}
           onConfirm={() => {
             clearHistory()
-            setHistory([])
+            setHistoryCount(0)
             setScanCount(0)
-            setConfirmClear(false)
+            setSheet(null)
             setToast('Scan history cleared')
           }}
         />

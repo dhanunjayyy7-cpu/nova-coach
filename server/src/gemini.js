@@ -43,6 +43,7 @@ async function attempt(body, timeoutMs) {
 export async function generateText({
   system,
   prompt,
+  contents, // optional multi-turn history; overrides `prompt`
   responseSchema,
   temperature = 0.4,
   maxOutputTokens = 512,
@@ -52,7 +53,7 @@ export async function generateText({
 
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    contents: contents ?? [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
       temperature,
       maxOutputTokens,

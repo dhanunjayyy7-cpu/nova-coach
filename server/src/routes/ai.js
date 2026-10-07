@@ -1,6 +1,26 @@
 import { Router } from 'express'
 import { generateText } from '../gemini.js'
-import { cleanSchema, homeMessageSchema } from '../schemas.js'
+import { alternativesSchema, chatSchema, cleanSchema, homeMessageSchema } from '../schemas.js'
+import { alternativesPrompt, chatSystemPrompt } from '../prompts.js'
+
+const ALTERNATIVES_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    alternatives: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          name: { type: 'STRING' },
+          brand: { type: 'STRING' },
+          why: { type: 'STRING' },
+        },
+        required: ['name', 'brand', 'why'],
+      },
+    },
+  },
+  required: ['alternatives'],
+}
 
 const ALLOWED_GOALS = new Set([
   'less sugar',
@@ -45,6 +65,59 @@ aiRouter.post('/clean-ingredients', async (req, res) => {
   } catch (err) {
     console.warn('[ai] clean-ingredients failed:', err.message)
     res.status(502).json({ error: 'Failed to clean ingredient text' })
+  }
+})
+
+aiRouter.post('/chat', async (req, res) => {
+  const { message, context, history } = chatSchema.parse(req.body)
+  const contents = [
+    ...history.map((turn) => ({
+      role: turn.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: turn.text }],
+    })),
+    { role: 'user', parts: [{ text: message }] },
+  ]
+
+  try {
+    const reply = await generateText({
+      system: chatSystemPrompt(context),
+      contents,
+      temperature: 0.5,
+      maxOutputTokens: 500,
+      // Leaves the app's 16s budget enough room to fall back to the Vercel function.
+      timeoutMs: 8000,
+    })
+    res.json({ reply })
+  } catch (err) {
+    console.warn('[ai] chat failed:', err.message)
+    res.status(502).json({ error: 'Nova can’t reply right now' })
+  }
+})
+
+aiRouter.post('/alternatives', async (req, res) => {
+  const input = alternativesSchema.parse(req.body)
+  try {
+    const text = await generateText({
+      system: 'You recommend healthier packaged-food alternatives sold in India. Reply with JSON only.',
+      prompt: alternativesPrompt(input),
+      responseSchema: ALTERNATIVES_SCHEMA,
+      temperature: 0.3,
+      maxOutputTokens: 500,
+      timeoutMs: 7000,
+    })
+    const alternatives = (JSON.parse(text).alternatives ?? [])
+      .filter((a) => a?.name && a?.why)
+      .slice(0, 3)
+      .map((a) => ({
+        name: String(a.name).slice(0, 80),
+        brand: String(a.brand ?? '').slice(0, 60),
+        why: String(a.why).slice(0, 160),
+      }))
+    if (alternatives.length === 0) throw new Error('No alternatives returned')
+    res.json({ alternatives })
+  } catch (err) {
+    console.warn('[ai] alternatives failed:', err.message)
+    res.status(502).json({ error: 'Alternatives not available' })
   }
 })
 

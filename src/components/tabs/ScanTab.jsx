@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { toChatProduct } from '../../utils/chatContext'
 import LabelScanner from '../scan/LabelScanner'
 import BarcodeScanner from '../scan/BarcodeScanner'
 import ScanResult from '../scan/ScanResult'
@@ -13,12 +14,19 @@ const MODES = [
   { key: 'barcode', label: 'Barcode' },
 ]
 
-function ScanTab() {
+function ScanTab({ onProductChange }) {
   const [mode, setMode] = useState('label')
   const [result, setResult] = useState(null)
   const [scanId, setScanId] = useState(null)
   const [coach, setCoach] = useState(null) // null for guests
   const requestRef = useRef(0)
+
+  // Lets the chat assistant know which product is on screen.
+  useEffect(() => {
+    onProductChange?.(result ? toChatProduct(result, coach) : null)
+  }, [result, coach, onProductChange])
+
+  useEffect(() => () => onProductChange?.(null), [onProductChange])
 
   function askCoach(next) {
     // The general score ignores the local profile — personalisation is the server's job here.
@@ -50,6 +58,8 @@ function ScanTab() {
       analysis: next.analysis,
       color: scoreColor(next.analysis.score),
       imageUrl: next.imageUrl,
+      barcode: next.barcode,
+      category: next.category,
       nutriments: next.nutriments,
       cleanedText: next.cleanedText,
     })

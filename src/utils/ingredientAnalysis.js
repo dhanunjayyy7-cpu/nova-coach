@@ -64,13 +64,16 @@ export function analyzeIngredients(rawText, profile = null) {
   return { ingredients: results, score }
 }
 
+// No packaged product scores a perfect 100 — the best possible is 85.
+export const SCORE_CAP = 85
+
 export function computeScore(results) {
   let score = 100
   for (const item of results) {
     if (item.risk === 'caution') score -= 10
     if (item.risk === 'avoid') score -= 25
   }
-  return Math.max(0, score)
+  return Math.min(SCORE_CAP, Math.max(0, score))
 }
 
 export function scoreColor(score) {

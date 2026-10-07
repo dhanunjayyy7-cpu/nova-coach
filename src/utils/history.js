@@ -1,3 +1,5 @@
+import { SCORE_CAP } from './ingredientAnalysis'
+
 const STORAGE_KEY = 'labelwise_history'
 const COUNT_KEY = 'nova_scan_count'
 // Saved items are never trimmed; this caps the unsaved ones.
@@ -5,10 +7,20 @@ const MAX_UNSAVED = 50
 
 const NUTRIENT_KEYS = ['energy-kcal_100g', 'proteins_100g', 'fat_100g', 'sugars_100g', 'salt_100g']
 
+// Scans saved before the 85 cap existed can hold scores up to 100.
+function capRecord(record) {
+  if (record.score <= SCORE_CAP) return record
+  return {
+    ...record,
+    score: SCORE_CAP,
+    analysis: record.analysis ? { ...record.analysis, score: SCORE_CAP } : record.analysis,
+  }
+}
+
 export function getHistory() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
+    return raw ? JSON.parse(raw).map(capRecord) : []
   } catch {
     return []
   }
@@ -60,8 +72,11 @@ export function saveScan(entry) {
     flaggedCount: flagged.length,
     analysis: entry.analysis,
     imageUrl: entry.imageUrl || '',
+    barcode: entry.barcode || '',
+    category: entry.category || '',
     nutriments,
     cleanedText: entry.cleanedText || '',
+    bookmarked: false,
   }
 
   // Read the count before writing, or the new record is counted twice via history.length.
@@ -79,6 +94,10 @@ export function saveScan(entry) {
 
 export function setSaved(id, saved) {
   writeHistory(getHistory().map((r) => (r.id === id ? { ...r, saved } : r)))
+}
+
+export function setBookmarked(id, bookmarked) {
+  writeHistory(getHistory().map((r) => (r.id === id ? { ...r, bookmarked } : r)))
 }
 
 export function getSavedScans() {

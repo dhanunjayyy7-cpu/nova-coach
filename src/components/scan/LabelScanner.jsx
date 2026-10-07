@@ -10,6 +10,8 @@ import {
   stopStream,
 } from '../../utils/camera'
 import CameraError from './CameraError'
+import GalleryButton from './GalleryButton'
+import { fileToCanvas } from './galleryImage'
 
 function LabelScanner({ onResult }) {
   const videoRef = useRef(null)
@@ -69,15 +71,36 @@ function LabelScanner({ onResult }) {
     setRetryToken((n) => n + 1)
   }
 
-  async function capture() {
+  const busy = phase === 'reading' || phase === 'cleaning'
+
+  function capture() {
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!ready || !video?.videoWidth || phase === 'reading' || phase === 'cleaning') return
+    if (!ready || !video?.videoWidth || busy) return
 
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+    runPipeline(canvas)
+  }
 
+  async function scanGalleryImage(file) {
+    if (busy) return
+    setPhase('reading')
+    setProgress(0)
+    let canvas
+    try {
+      canvas = await fileToCanvas(file)
+    } catch (err) {
+      console.error('Gallery image error:', err)
+      if (mountedRef.current) setPhase('failed')
+      return
+    }
+    runPipeline(canvas)
+  }
+
+  // OCR → AI clean-up → local scoring, for a camera frame or a gallery photo.
+  async function runPipeline(source) {
     setPhase('reading')
     setProgress(0)
 
@@ -91,7 +114,7 @@ function LabelScanner({ onResult }) {
           }
         },
       })
-      const { data } = await worker.recognize(canvas)
+      const { data } = await worker.recognize(source)
       rawText = data.text.trim()
     } catch (err) {
       console.error('OCR error:', err)
@@ -125,7 +148,6 @@ function LabelScanner({ onResult }) {
   }
 
   const error = unavailable ?? cameraError
-  const busy = phase === 'reading' || phase === 'cleaning'
 
   return (
     <>
@@ -164,7 +186,17 @@ function LabelScanner({ onResult }) {
             <p>{phase === 'reading' ? `Reading label… ${progress}%` : 'Analysing ingredients…'}</p>
           </div>
         )}
+
+        {/* Works without a camera too — the only option when access is blocked. */}
+        {!busy && <GalleryButton onPick={scanGalleryImage} />}
       </div>
+
+      {error && phase === 'failed' && (
+        <p className="scan-footnote scan-footnote-error">Couldn’t read that photo. Try a sharper, well-lit one.</p>
+      )}
+      {error && phase !== 'failed' && (
+        <p className="scan-footnote">Or upload a photo of the ingredient list from your gallery.</p>
+      )}
 
       <div className="shutter-row">
         <button

@@ -51,7 +51,7 @@
 .camera-hint {
   position: absolute;
   left: 50%;
-  bottom: 18px;
+  bottom: 76px; /* clears the gallery button */
   margin: 0;
   max-width: calc(100% - 32px);
   padding: 8px 16px;
@@ -260,6 +260,37 @@
   min-width: 180px;
   margin-top: 12px;
   padding: 0 24px;
+}
+
+/* Gallery upload — bottom-left of the viewfinder */
+.gallery-btn {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 3;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 16px;
+  background: rgba(15, 16, 32, 0.6);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  transition: transform 0.12s ease;
+}
+
+.gallery-btn:active {
+  transform: scale(0.92);
+}
+
+.camera-error ~ .gallery-btn {
+  background: var(--ink);
+}
+
+.scan-footnote-error {
+  color: #e5394b;
+  font-weight: 600;
 }
 
 /* Shutter */
