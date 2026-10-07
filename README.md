@@ -1,4 +1,4 @@
-# NOVA + Nova Coach
+# NOVA + Nova Coach 
 
 > **Hackathon note:** NOVA (the scanner app) existed before this hackathon. **Nova Coach** — the
 > Express/Gemini personalisation layer, login, and personal verdicts — was built today.
